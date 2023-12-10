@@ -41,6 +41,21 @@
 
         exerciseForm.submit();
       });
-    </script>
+
+      const exerciseId = document.getElementById("uid");
+
+      exerciseId.addEventListener('click', () => {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            exerciseId.value = this.responseText;
+          }
+        }
+
+        const userName = document.getElementById('uname').value;
+        xhttp.open('GET', '/api/currentUser/' + userName, true);
+        xhttp.send();
+      });
+     </script>
   </body>
 </html>
