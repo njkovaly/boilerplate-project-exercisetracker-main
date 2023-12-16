@@ -12,8 +12,7 @@ let mongoose = require('mongoose')
 mongoose.connect(process.env.MONGO_URI)
 
 const UserSchema = new mongoose.Schema({
-  _id: Object,
-  username: String
+  'username': String
 })
 
 let user = mongoose.model('User', UserSchema);
@@ -28,27 +27,47 @@ const SessionSchema = new mongoose.Schema({
 let session = mongoose.model('Session', SessionSchema)
 
 app.post('/api/users', (req, res) => {
-  const myID = new mongoose.Types.ObjectId ();
-  const name = req.body.username;
   user.create({
-    _id: myID,
-    username: name
-  })
-  res.json({
-    '_id': myID,  
-    'username': name
-  })
+    username: req.body.username
+  }) 
+  user.findOne({'username': req.body.username})
+  .exec()
+  .then( (doc) => {
+    console.log(doc);
+    res.json({
+      'username': doc.username,
+      '_id': doc._id
+    });
+  }) 
 });
 
 app.post('/api/users/:_id/exercises', (req, res) => {
-  const name = req.body.username;
-  user.create({
-    _id: myID,
-    username: name
+  const userid = req.params._id;
+  const desc = req.body.description;
+  const dur = req.body.duration;
+  var date = Date();
+  var todaysDate = new Date(date).toDateString();
+  var exdate = new Date(req.body.date).toDateString();
+  if (exdate == "Invalid Date") {
+    exdate = todaysDate;
+  }
+  console.log(exdate);
+  session.create({
+    user_id: userid,
+    description: desc,
+    duration: dur,
+    date: exdate
   })
-  res.json({
-    '_id': myID,  
-    'username': name
+  user.findOne({'_id': userid})
+  .exec()
+  .then( (doc) => {
+    res.json({
+      '_id': userid,
+      'username': doc.username,
+      'date': exdate,
+      'duration': dur,
+      'description': desc
+    })
   })
 });
 
@@ -67,7 +86,8 @@ app.get('/api/currentUser/:username', (req, res) => {
   user.findOne({ username: req.params.username}, '_id')
   .exec()
   .then( (doc) => {
-    res.send(doc._id);
+    const new_id = (doc.id.replace(/\"/g, ""));
+    res.send(new_id);
   })
 
 //  const id = req.params.id;
