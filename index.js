@@ -86,13 +86,33 @@ app.get('/api/currentUser/:username', (req, res) => {
   user.findOne({ username: req.params.username}, '_id')
   .exec()
   .then( (doc) => {
-    const new_id = (doc.id.replace(/\"/g, ""));
-    res.send(new_id);
+    res.send(doc._id.toString());
   })
-
-//  const id = req.params.id;
-//  res.send(id);
 })
+
+app.get('/api/users/:_id/exercises', async (req, res) => {
+  const getUser = user.findOne({ _id: req.params._id}).exec();
+  const thisUser = await getUser;
+  const curUser = thisUser.username;
+  console.log(curUser);
+
+  const countExercises = session.countDocuments({user_id: req.params._id }).exec();
+  const count = await countExercises;
+  const strCount = count.toString(); /* Change this back to numeric */
+  console.log(strCount);
+
+  const getExercises = session.find({user_id: req.params._id}, 'description duration date' ).exec();
+  const exercises = await getExercises;
+  console.log(exercises);
+
+  res.json({
+    username: curUser,
+    count: count,
+    _id: req.params._id,
+    log: exercises
+  })
+})
+
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
