@@ -1,74 +1,71 @@
-const express = require('express')
-const app = express()
-const cors = require('cors')
-require('dotenv').config()
+const express = require('express');
+const app = express();
+const cors = require('cors');
+require('dotenv').config();
+app.use(cors());
+app.use(express.static('public'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true} ));
 
-app.use(cors())
-app.use(express.static('public'))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true} ))
-
-let mongoose = require('mongoose')
+let mongoose = require('mongoose');
+const { Schema } = mongoose;
 mongoose.connect(process.env.MONGO_URI)
 
 const UserSchema = new mongoose.Schema({
-  'username': String
+  username: String
 })
 
 let user = mongoose.model('User', UserSchema);
 
 const SessionSchema = new mongoose.Schema({
-  'user_id': Object,
-  'description': String,
-  'duration': Number,
-  'date': Date
+  user_id: String,
+  description: String,
+  duration: Number,
+  date: Date
 });
 
 let session = mongoose.model('Session', SessionSchema)
 
-app.post('/api/users', (req, res) => {
-  user.create({
+app.post('/api/users', async (req, res) => {
+  await user.create({
     username: req.body.username
   }) 
   user.findOne({'username': req.body.username})
   .exec()
   .then( (doc) => {
-    console.log(doc);
     res.json({
-      'username': doc.username,
-      '_id': doc._id
+      username: doc.username,
+      _id: doc._id
     });
   }) 
 });
 
-app.post('/api/users/:_id/exercises', (req, res) => {
-  const userid = req.params._id;
+app.post('/api/users/:_id/exercises', async (req, res) => {
+  const id = req.params._id;
+  const username = await user.findById(id);
   const desc = req.body.description;
-  const dur = req.body.duration;
-  var date = Date();
-  var todaysDate = new Date(date).toDateString();
-  var exdate = new Date(req.body.date).toDateString();
-  if (exdate == "Invalid Date") {
-    exdate = todaysDate;
-  }
-  console.log(exdate);
-  session.create({
-    user_id: userid,
+  const dur = parseInt(req.body.duration);
+  const date = req.body.date ? new Date(req.body.date) : new Date()
+
+  var exercise = await session.create({
+    user_id: id,
     description: desc,
     duration: dur,
-    date: exdate
+    date: date
   })
-  user.findOne({'_id': userid})
-  .exec()
-  .then( (doc) => {
-    res.json({
-      '_id': userid,
-      'username': doc.username,
-      'date': exdate,
-      'duration': dur,
-      'description': desc
-    })
-  })
+
+var exObject = {
+  _id: username._id, 
+  username: username.username,
+  date: new Date(exercise.date).toDateString(),
+  duration: exercise.duration,
+  description: exercise.description
+}
+
+res.send(exObject);
+
+//  res.set('Content-Type', 'application/json');
+//  res.send(JSON.stringify(exObject, null, 2)); 
 });
 
 app.get('/api/users', (req, res) => {
@@ -90,28 +87,40 @@ app.get('/api/currentUser/:username', (req, res) => {
   })
 })
 
-app.get('/api/users/:_id/exercises', async (req, res) => {
-  const getUser = user.findOne({ _id: req.params._id}).exec();
-  const thisUser = await getUser;
-  const curUser = thisUser.username;
-  console.log(curUser);
+app.get('/api/users/:_id/logs', async (req, res) => {
+  const id = req.params._id;
+  const curUser = await user.findById( id );
+  const { from, to, limit } = req.query;
 
-  const countExercises = session.countDocuments({user_id: req.params._id }).exec();
-  const count = await countExercises;
-  const strCount = count.toString(); /* Change this back to numeric */
-  console.log(strCount);
+ // const countExercises = session.countDocuments({ 'user_id': id });
+ // const count = await countExercises.exec();
+ // console.log(count);
 
-  const getExercises = session.find({user_id: req.params._id}, 'description duration date' ).exec();
-  const exercises = await getExercises;
-  console.log(exercises);
+  
+  var exercises = []
+  if (!from) {
+    var getExercises1 = session.find({user_id: id}, { user_id: 0, _id: 0, __v: 0 });
+    exercises = await getExercises1.exec();
+  } else {
+    var getExercises2 = session.find({user_id: id,  date: {$gte: new Date(from), $lte: new Date(to)}}, {user_id: 0, _id: 0, __v: 0 }).limit(limit);
+    exercises = await getExercises2.exec();
+ }
 
-  res.json({
-    username: curUser,
-    count: count,
-    _id: req.params._id,
-    log: exercises
-  })
-})
+  const log = exercises.map(e => ({
+    description : e.description,
+    duration : e.duration,
+    date: e.date.toDateString()
+  }));
+
+  responseObject = {
+    _id: curUser._id,
+    username: curUser.username,
+    count: exercises.length,
+    log
+  };
+//  res.set('Content-Type', 'application/json');
+  res.send(responseObject);
+});
 
 
 const listener = app.listen(process.env.PORT || 3000, () => {
