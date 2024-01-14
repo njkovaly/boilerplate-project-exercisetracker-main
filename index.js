@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const moment = require('moment');
 require('dotenv').config();
 app.use(cors());
 app.use(express.static('public'));
@@ -45,7 +46,15 @@ app.post('/api/users/:_id/exercises', async (req, res) => {
   const username = await user.findById(id);
   const desc = req.body.description;
   const dur = parseInt(req.body.duration);
-  const date = req.body.date ? new Date(req.body.date) : new Date()
+  var date = req.body.date ? new Date(req.body.date) : new Date();
+
+  function addHours(date, hours) {
+    const hoursToAdd = hours * 60 * 60 * 1000;
+    date.setTime(date.getTime() + hoursToAdd);
+    return date;
+  }
+
+  date = addHours(date, 6);
 
   var exercise = await session.create({
     user_id: id,
@@ -57,15 +66,13 @@ app.post('/api/users/:_id/exercises', async (req, res) => {
 var exObject = {
   _id: username._id, 
   username: username.username,
-  date: new Date(exercise.date).toDateString(),
-  duration: exercise.duration,
-  description: exercise.description
+  description: exercise.description,
+  duration: exercise.duration, 
+  date: new Date(date).toDateString()
 }
 
-res.send(exObject);
+res.json(exObject);
 
-//  res.set('Content-Type', 'application/json');
-//  res.send(JSON.stringify(exObject, null, 2)); 
 });
 
 app.get('/api/users', (req, res) => {
@@ -90,21 +97,21 @@ app.get('/api/currentUser/:username', (req, res) => {
 app.get('/api/users/:_id/logs', async (req, res) => {
   const id = req.params._id;
   const curUser = await user.findById( id );
-  const { from, to, limit } = req.query;
-
- // const countExercises = session.countDocuments({ 'user_id': id });
- // const count = await countExercises.exec();
- // console.log(count);
-
+  var { from, to, limit } = req.query;
   
   var exercises = []
   if (!from) {
-    var getExercises1 = session.find({user_id: id}, { user_id: 0, _id: 0, __v: 0 });
-    exercises = await getExercises1.exec();
-  } else {
-    var getExercises2 = session.find({user_id: id,  date: {$gte: new Date(from), $lte: new Date(to)}}, {user_id: 0, _id: 0, __v: 0 }).limit(limit);
-    exercises = await getExercises2.exec();
- }
+    from = '0000-00-00';
+  }
+  if (!to) {
+    to = '9999-12-31';
+  }
+  if (!limit) {
+    limit = 1000;
+  }
+
+  var getExercises = session.find({user_id: id/*,  date: {$gte: new Date(from), $lte: new Date(to)}*/}, {user_id: 0, _id: 0, __v: 0 }).limit(limit);
+  exercises = await getExercises.exec();
 
   const log = exercises.map(e => ({
     description : e.description,
@@ -118,8 +125,8 @@ app.get('/api/users/:_id/logs', async (req, res) => {
     count: exercises.length,
     log
   };
-//  res.set('Content-Type', 'application/json');
-  res.send(responseObject);
+
+  res.json(responseObject);
 });
 
 
